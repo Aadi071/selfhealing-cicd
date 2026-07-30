@@ -1,0 +1,24 @@
+# Ingress is intentionally minimal in the base. Overlays set:
+#   - ingressClassName  (traefik on the k3s prod box; nginx on a kind dev cluster)
+#   - the host          (e.g. canary.<ip>.nip.io locally, canary.example.com in prod)
+#   - TLS               (cert-manager annotations, added at P5)
+# On kind you can skip ingress entirely and `kubectl port-forward` the Service.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app
+  labels:
+    app.kubernetes.io/name: app
+    app.kubernetes.io/part-of: selfhealing-cicd
+spec:
+  rules:
+    - host: app.local # overlays override
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app
+                port:
+                  name: http

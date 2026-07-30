@@ -1,0 +1,16 @@
+# Per-app tweaks. Everything else is inherited from the base contract.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app # matches the base resource; namePrefix renames it to canary-app
+spec:
+  template:
+    spec:
+      containers:
+        - name: app
+          env:
+            - name: VERSION
+              value: "dev" # CI overwrites this with the build tag
+            # Uncomment to ship a born-broken build and watch the PIPELINE roll back:
+            # - name: FAULT_MODE
+            #   value: "true"

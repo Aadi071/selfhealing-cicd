@@ -1,0 +1,22 @@
+# Onboarding an app = an overlay this small. That is the proof the platform
+# generalizes (P6 does the same for P1 and P3).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: canary
+namePrefix: canary-
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+# Point every "app:latest" at the real image. CI overwrites newTag with the
+# git SHA / build version via `kustomize edit set image`.
+images:
+  - name: app
+    newName: ghcr.io/GHCR_OWNER/canary # <- replaced once the repo exists (P0/P1)
+    newTag: dev
+
+patches:
+  - path: patch-deployment.yaml
+  - path: patch-ingress.yaml

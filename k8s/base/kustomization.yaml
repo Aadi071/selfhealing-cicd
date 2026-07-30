@@ -1,0 +1,8 @@
+# The reusable contract. Consumed by every app overlay under k8s/apps/*.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml

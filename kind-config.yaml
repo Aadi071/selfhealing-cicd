@@ -1,0 +1,20 @@
+# kind cluster wired for ingress: maps host :80/:443 into the cluster and labels
+# the node so ingress-nginx schedules on it. One control-plane node is plenty for
+# the dev loop (prod is the single-node k3s box in P5).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "ingress-ready=true"
+    extraPortMappings:
+      - containerPort: 80
+        hostPort: 80
+        protocol: TCP
+      - containerPort: 443
+        hostPort: 443
+        protocol: TCP

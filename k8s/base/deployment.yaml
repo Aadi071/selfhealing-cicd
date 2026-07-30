@@ -1,0 +1,95 @@
+# The DEPLOYMENT CONTRACT.
+# Every app on the platform conforms to this shape. Overlays (canary, p1, p3)
+# patch only image / name / host / env — never the guarantees encoded here:
+#   - rollout that never drops below full capacity (maxUnavailable: 0)
+#   - a real readiness-vs-liveness split
+#   - locked-down securityContext
+#   - graceful shutdown window
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app # overlays set the real name
+  labels:
+    app.kubernetes.io/name: app
+    app.kubernetes.io/part-of: selfhealing-cicd
+spec:
+  replicas: 2 # 2 so a rolling update can keep serving through the swap
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: app
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0 # never take a healthy pod down before the new one is Ready
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: app
+        app.kubernetes.io/part-of: selfhealing-cicd
+      annotations:
+        # Annotation-based scrape: our standalone Prometheus discovers pods
+        # carrying these (no operator / ServiceMonitor needed).
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+    spec:
+      # Give in-flight requests time to finish on shutdown. The WebSocket tenant
+      # (P1) will extend this with a preStop drain; the contract reserves the window.
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532 # distroless "nonroot" uid
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: app:latest # overlays set the real image + tag
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: VERSION
+              value: "dev" # overlays inject the build version
+          # LIVENESS: is the process alive? Deliberately NOT tied to app health,
+          # so a faulted-but-running pod is detected+rolled back, not silently
+          # restarted (which would mask the bad deploy).
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            failureThreshold: 3
+          # READINESS: should this pod receive traffic right now? Gates rollout —
+          # traffic is withheld until the new pod reports ready, and (combined
+          # with maxUnavailable:0) a never-ready new pod means the old one keeps
+          # all the traffic.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 3
+          # STARTUP: protects slow starters from the liveness probe killing them
+          # before they've booted.
+          startupProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 3
+            failureThreshold: 20 # up to ~60s to come up
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 200m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

@@ -1,0 +1,130 @@
+name: deploy
+
+# Build the canary image, push it to GHCR, then roll it out to the cluster and
+# BLOCK on the rollout — a stalled rollout fails the job. This is the reusable
+# spine P1/P3 reuse later (just point context/image/namespace at their app).
+#
+# Reality check baked in: GitHub-hosted runners cannot reach a local kind
+# cluster on your laptop. So build+push runs from day one, but the deploy job
+# self-skips until a KUBE_CONFIG secret exists (i.e. until P5 stands up the
+# public k3s box). The kind dev loop uses scripts/deploy-local.* instead.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "canary/**"
+      - "k8s/**"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  packages: write # push to GHCR
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/canary
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive version from commit
+        id: meta
+        run: echo "version=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: ./canary
+          push: true
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.version }}
+            ${{ env.IMAGE }}:latest
+
+  deploy:
+    needs: build-push
+    runs-on: ubuntu-latest
+    env:
+      KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }} # base64 kubeconfig; absent until P5
+      VERSION: ${{ needs.build-push.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Referencing the secret via env (not inline ${{ }}) keeps it out of the
+      # command text and lets Actions mask it.
+      - name: Is a cluster wired up?
+        id: guard
+        run: |
+          if [ -z "$KUBE_CONFIG" ]; then
+            echo "No KUBE_CONFIG secret — skipping deploy (expected until P5)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure kubectl
+        if: steps.guard.outputs.ready == 'true'
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "$KUBE_CONFIG" | base64 -d > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+
+      - name: Point overlay at the freshly pushed image
+        if: steps.guard.outputs.ready == 'true'
+        working-directory: k8s/apps/canary
+        run: |
+          sed -i "s|newName:.*|newName: ${IMAGE}|" kustomization.yaml
+          sed -i "s|newTag:.*|newTag: ${VERSION}|" kustomization.yaml
+
+      - name: Apply
+        if: steps.guard.outputs.ready == 'true'
+        run: kubectl apply -k k8s/apps/canary
+
+      # Block on the rollout. maxUnavailable:0 means a bad image never goes Ready,
+      # so this times out and the JOB FAILS — surfacing the bad deploy instead of
+      # silently "succeeding".
+      - name: Wait for rollout
+        if: steps.guard.outputs.ready == 'true'
+        run: kubectl -n canary rollout status deploy/canary-app --timeout=120s
+
+      # Rollout succeeding is NOT enough — a FAULT_MODE pod passes its probes and
+      # goes Ready while serving 500s. The smoke test actually hits /work and is
+      # what catches that class of bad deploy.
+      - name: Smoke test
+        if: steps.guard.outputs.ready == 'true'
+        run: |
+          kubectl -n canary port-forward svc/canary-app 18080:80 &
+          PF=$!
+          sleep 3
+          TARGET=http://localhost:18080 REQUESTS=30 MAX_ERROR_RATE=0 bash scripts/smoke.sh
+          rc=$?
+          kill $PF 2>/dev/null || true
+          exit $rc
+
+      # If ANY step above failed (rollout stalled OR smoke failed), roll back to
+      # the last-good ReplicaSet and end the job red. This is PIPELINE rollback —
+      # the deploy-time safety net. (Post-green production rollback is P4.)
+      - name: Roll back on failure
+        if: failure() && steps.guard.outputs.ready == 'true'
+        run: |
+          echo "Deploy failed — rolling back to previous revision."
+          kubectl -n canary rollout undo deploy/canary-app
+          kubectl -n canary rollout status deploy/canary-app --timeout=120s
+          echo "Rolled back. Failing the job so the bad deploy is visible."
+          exit 1

@@ -1,0 +1,21 @@
+# Dev/kind ingress. On the k3s prod box (P5) a prod overlay swaps this for
+# ingressClassName: traefik + a real host + cert-manager TLS.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app
+spec:
+  ingressClassName: nginx # kind's ingress-nginx; k3s uses "traefik"
+  rules:
+    # nip.io resolves *.127.0.0.1.nip.io -> 127.0.0.1, so this works on kind
+    # with no /etc/hosts editing.
+    - host: canary.127.0.0.1.nip.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: app
+                port:
+                  name: http
