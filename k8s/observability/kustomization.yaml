@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - namespace.yaml
+  - prometheus-rbac.yaml
+  - prometheus-deploy.yaml
+  - grafana-deploy.yaml
+
+# Build the config/dashboard ConfigMaps straight from their source files, so the
+# YAML never has to embed escaped JSON. Stable names (no hash suffix) so the
+# Deployments can reference them by plain name.
+configMapGenerator:
+  - name: prometheus-config
+    files:
+      - files/prometheus.yml
+  - name: grafana-datasource
+    files:
+      - files/grafana-datasource.yaml
+  - name: grafana-dashboard-provider
+    files:
+      - files/grafana-dashboard-provider.yaml
+  - name: grafana-dashboards
+    files:
+      - files/dashboards/canary.json
+
+generatorOptions:
+  disableNameSuffixHash: true

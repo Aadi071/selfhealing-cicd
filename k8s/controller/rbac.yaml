@@ -1,0 +1,39 @@
+# The controller only needs to read/roll-back deployments in the app's namespace.
+# Namespace-scoped Role (not ClusterRole) — least privilege, and a good talking
+# point: the healer can undo a rollout but can't touch anything else.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: healer
+  namespace: canary
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: healer
+  namespace: canary
+rules:
+  # rollout undo = read the ReplicaSet history + patch the Deployment back.
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: healer
+  namespace: canary
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: healer
+subjects:
+  - kind: ServiceAccount
+    name: healer
+    namespace: canary
