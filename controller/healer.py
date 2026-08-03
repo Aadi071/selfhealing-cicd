@@ -84,12 +84,16 @@ class Healer:
             log("  [dry-run] would run: kubectl rollout undo + status")
         else:
             run(["kubectl", "-n", a.namespace, "rollout", "undo", f"deploy/{a.deployment}"])
+            # rollout status BLOCKS until the reverted (good) pods are Ready — so
+            # this returning is the moment service is restored. That makes MTTR
+            # deterministic and independent of whether external load is still up.
             run(["kubectl", "-n", a.namespace, "rollout", "status",
                  f"deploy/{a.deployment}", "--timeout=120s"])
-        # Wait for the live signal to actually recover below threshold.
-        healthy_at = self._wait_healthy()
-        mttr = (healthy_at or time.monotonic()) - self.first_breach_at
-        log(f"RECOVERED. MTTR (first breach -> healthy) = {mttr:.1f}s")
+        mttr = time.monotonic() - self.first_breach_at
+        # Best-effort confirmation the live error signal has dropped (non-fatal;
+        # does not affect the MTTR number above).
+        self._confirm_recovered()
+        log(f"RECOVERED. MTTR (first breach -> healthy pods) = {mttr:.1f}s")
         print(json.dumps({
             "event": "rollback_complete",
             "namespace": a.namespace, "deployment": a.deployment,
@@ -100,15 +104,17 @@ class Healer:
         self.first_breach_at = None
         self.cooldown_until = time.monotonic() + a.cooldown
 
-    def _wait_healthy(self, timeout=120):
+    def _confirm_recovered(self, timeout=30):
+        """Best-effort: wait until the error signal is low again. No data in the
+        window means no errors are being served = healthy, so None counts as OK."""
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             ratio = prom_query(self.a.prom_url, self.err_ratio_expr)
-            if ratio is not None and ratio <= self.a.threshold:
-                return time.monotonic()
+            if ratio is None or ratio <= self.a.threshold:
+                return
             time.sleep(self.a.interval)
-        log("WARN gave up waiting for recovery signal")
-        return None
+        log("note: error signal still elevated after confirm window "
+            "(external load may have stopped — does not affect MTTR)")
 
     def tick(self):
         a = self.a

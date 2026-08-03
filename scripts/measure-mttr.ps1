@@ -23,7 +23,11 @@
 #>
 param(
   [string]$PromUrl = "http://localhost:9090",
-  [string]$AppUrl  = "http://localhost:8080",
+  # Load goes through the ingress (localhost:80 + Host header), NOT a pod
+  # port-forward - a port-forward pins to one pod and dies when a rollout
+  # replaces it, killing the load mid-experiment. The ingress survives rollouts.
+  [string]$AppUrl  = "http://localhost:80",
+  [string]$HostHeader = "canary.127.0.0.1.nip.io",
   [string]$Namespace = "canary",
   [string]$Deployment = "canary-app",
   [double]$Threshold = 0.2,
@@ -49,11 +53,14 @@ for ($n = 1; $n -le $Iterations; $n++) {
   kubectl -n $Namespace set env deploy/$Deployment FAULT_MODE- 2>$null | Out-Null
   kubectl -n $Namespace rollout status deploy/$Deployment --timeout=120s | Out-Null
 
-  # 2. Background load so rate() has signal.
+  # 2. Background load so rate() has signal. Hits the ingress (survives rollouts)
+  #    with an explicit Host header so no DNS is needed.
   $load = Start-Job -ScriptBlock {
-    param($u)
-    while ($true) { try { Invoke-WebRequest "$u/work" -TimeoutSec 3 -UseBasicParsing | Out-Null } catch {} }
-  } -ArgumentList $AppUrl
+    param($u, $h)
+    while ($true) {
+      try { Invoke-WebRequest "$u/work" -Headers @{ Host = $h } -TimeoutSec 3 -UseBasicParsing | Out-Null } catch {}
+    }
+  } -ArgumentList $AppUrl, $HostHeader
   Start-Sleep -Seconds 8   # let the baseline rate build up
 
   # 3. Inject the fault and start the clock.

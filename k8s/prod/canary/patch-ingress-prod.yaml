@@ -1,0 +1,26 @@
+# Prod ingress: k3s Traefik + a real host + automatic TLS via cert-manager.
+# Replace YOUR_DOMAIN throughout (e.g. canary.example.com). Start on the staging
+# issuer; flip the annotation to letsencrypt-prod once issuance works.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: canary-app
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - canary.YOUR_DOMAIN
+      secretName: canary-tls
+  rules:
+    - host: canary.YOUR_DOMAIN
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: canary-app
+                port:
+                  name: http
