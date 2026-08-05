@@ -1,0 +1,21 @@
+{
+  "name": "selfhealing-cicd",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+  "onCreateCommand": "bash .devcontainer/setup.sh",
+  "postAttachCommand": "bash .devcontainer/welcome.sh",
+  "forwardPorts": [3000, 8080, 9090],
+  "portsAttributes": {
+    "3000": { "label": "Grafana", "onAutoForward": "silent" },
+    "8080": { "label": "Canary", "onAutoForward": "silent" },
+    "9090": { "label": "Prometheus", "onAutoForward": "silent" }
+  },
+  "remoteUser": "vscode"
+}

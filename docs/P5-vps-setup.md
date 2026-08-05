@@ -97,11 +97,10 @@ kubectl apply -k k8s\observability
 kubectl apply -f k8s\prod\ci-rbac.yaml       # creates the canary ns + ci-deployer
 ```
 
-Point the image + host at real values, then deploy the canary (prod overlay):
+The image ref is already set to `ghcr.io/aadi071/canary` (your account). Just put
+your domain into the prod ingress, then deploy the canary (prod overlay):
 
 ```powershell
-# your GitHub username into the image ref:
-(Get-Content k8s\apps\canary\kustomization.yaml) -replace 'GHCR_OWNER','YOUR_GH_USERNAME' | Set-Content k8s\apps\canary\kustomization.yaml
 # your domain into the prod ingress:
 (Get-Content k8s\prod\canary\patch-ingress-prod.yaml) -replace 'YOUR_DOMAIN','yourdomain.com' | Set-Content k8s\prod\canary\patch-ingress-prod.yaml
 
@@ -171,8 +170,7 @@ rollout status. That's the pipeline going fully live.
 Same demo as local, now against prod (the healer runs in-cluster this time):
 
 ```powershell
-# build + push the controller image via CI (or manually), then:
-(Get-Content k8s\controller\kustomization.yaml) -replace 'GHCR_OWNER','YOUR_GH_USERNAME' | Set-Content k8s\controller\kustomization.yaml
+# controller image ref is already ghcr.io/aadi071/healer; build+push it, then:
 kubectl apply -k k8s\controller
 kubectl -n canary rollout status deploy/healer
 

@@ -22,7 +22,7 @@ spec:
         runAsUser: 65532
       containers:
         - name: healer
-          image: ghcr.io/GHCR_OWNER/healer:dev # CI sets this, like the canary
+          image: ghcr.io/aadi071/healer:dev # CI sets this, like the canary (lowercase)
           env:
             - name: PROM_URL
               value: http://prometheus.monitoring.svc.cluster.local:9090
@@ -38,6 +38,8 @@ spec:
               value: "3"
             - name: COOLDOWN
               value: "60"
+            - name: HOME
+              value: /tmp # kubectl writes its discovery cache under $HOME
           resources:
             requests:
               cpu: 25m
@@ -46,6 +48,12 @@ spec:
               memory: 64Mi
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: true # so give kubectl a writable /tmp below
             capabilities:
               drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

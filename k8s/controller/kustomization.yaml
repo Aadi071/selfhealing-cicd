@@ -6,5 +6,5 @@ resources:
   - deployment.yaml
 
 images:
-  - name: ghcr.io/GHCR_OWNER/healer
+  - name: ghcr.io/aadi071/healer
     newTag: dev

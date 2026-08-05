@@ -1,5 +1,8 @@
 # ---- build stage -----------------------------------------------------------
-FROM golang:1.22-alpine AS build
+# Build on the native runner arch (fast), cross-compile to the target arch. This
+# lets one pipeline produce both linux/amd64 (local kind) and linux/arm64
+# (Oracle Cloud Always Free is ARM) from a single Go build, no QEMU needed here.
+FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS build
 WORKDIR /src
 
 # Copy module files first for layer caching (no external deps, so this is fast).
@@ -8,8 +11,10 @@ COPY main.go ./
 
 # Static build: CGO off so the binary runs on a scratch/distroless base.
 # VERSION is injected at build time so we can watch v1 -> v2(bad) -> rollback.
+# TARGETOS/TARGETARCH are provided automatically by buildx per target platform.
 ARG VERSION=dev
-ENV CGO_ENABLED=0 GOOS=linux
+ARG TARGETOS TARGETARCH
+ENV CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH}
 RUN go build -trimpath -ldflags="-s -w" -o /canary .
 
 # ---- runtime stage ---------------------------------------------------------

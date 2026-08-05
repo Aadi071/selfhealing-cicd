@@ -11,6 +11,44 @@ Prometheus + Grafana · a custom rollback controller.
 
 ---
 
+## Run it yourself
+
+### Zero install — in your browser
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/aadi071/selfhealing-cicd)
+
+Click the badge → wait for the Codespace to build → in the terminal run
+`./quickstart.sh`. The whole platform comes up in a free browser VM (Docker, kind,
+and kubectl are preinstalled). No account beyond GitHub, nothing on your machine.
+
+### On your PC — one command
+
+You need only **Docker**, **[kind](https://kind.sigs.k8s.io/)**, and **kubectl**.
+The script builds everything and stands up the whole platform (monitoring + the
+canary + the self-healing controller) on a local cluster.
+
+```bash
+# macOS / Linux
+./quickstart.sh
+```
+```powershell
+# Windows
+.\quickstart.ps1
+```
+
+Then watch a green deploy heal itself:
+
+```bash
+kubectl -n canary port-forward svc/canary-app 8080:80 &
+curl -XPOST http://localhost:8080/fault/on      # break it
+kubectl -n canary logs deploy/healer -f          # watch the auto-rollback
+```
+
+Tear it all down with `./teardown.sh` (or `.\teardown.ps1`). Nothing persists
+outside the kind cluster.
+
+---
+
 ## Repo layout
 
 | Path | What lives here |
