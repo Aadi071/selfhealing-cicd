@@ -1,0 +1,11 @@
+# Tells Grafana to load any dashboard JSON dropped in /var/lib/grafana/dashboards.
+apiVersion: 1
+providers:
+  - name: selfhealing-cicd
+    orgId: 1
+    folder: ""
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards

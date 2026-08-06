@@ -14,7 +14,7 @@ resources:
 # git SHA / build version via `kustomize edit set image`.
 images:
   - name: app
-    newName: ghcr.io/GHCR_OWNER/canary # <- replaced once the repo exists (P0/P1)
+    newName: ghcr.io/aadi071/canary # GHCR path must be lowercase (user Aadi071)
     newTag: dev
 
 patches:

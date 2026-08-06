@@ -1,0 +1,10 @@
+# Auto-provisioned datasource: Grafana points at the in-cluster Prometheus on
+# first boot, no click-ops.
+apiVersion: 1
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    access: proxy
+    url: http://prometheus.monitoring.svc.cluster.local:9090
+    isDefault: true
