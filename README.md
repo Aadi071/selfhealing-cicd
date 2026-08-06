@@ -1,6 +1,6 @@
 # Self-Healing CI/CD Platform
 
-Project 10 of the SWE portfolio. A CI/CD **platform** — not a pipeline for one app.
+A CI/CD **platform** — not a pipeline for one app.
 It deploys apps to Kubernetes, smoke-tests them, and **rolls back automatically when
 production error rate breaches a threshold** — rollback triggered by a live signal
 *after* the pipeline has already gone green. P1 (doc editor) and P3 (RAG assistant)
