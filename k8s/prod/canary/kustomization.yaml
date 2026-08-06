@@ -1,0 +1,14 @@
+# Prod overlay for the canary: the kind app overlay + a Traefik/TLS ingress patch.
+# CI still seds the image name/tag into k8s/apps/canary/kustomization.yaml (the
+# inner overlay carries the image transform); this overlay only swaps the ingress.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../apps/canary
+
+patches:
+  - path: patch-ingress-prod.yaml
+    target:
+      kind: Ingress
+      name: canary-app

@@ -29,7 +29,7 @@ kubectl create namespace canary --dry-run=client -o yaml | kubectl apply -f -
 
 # Render the overlay and swap the GHCR image ref for the locally-loaded one.
 $rendered = kubectl kustomize "$root\k8s\apps\canary"
-$rendered = $rendered -replace 'ghcr\.io/GHCR_OWNER/canary:dev', $img
+$rendered = $rendered -replace 'ghcr\.io/aadi071/canary:dev', $img
 $rendered | kubectl apply -f -
 
 if ($Fault) {

@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healer
+  namespace: canary
+  labels:
+    app.kubernetes.io/name: healer
+    app.kubernetes.io/part-of: selfhealing-cicd
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: healer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: healer
+    spec:
+      serviceAccountName: healer
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+      containers:
+        - name: healer
+          image: ghcr.io/aadi071/healer:dev # CI sets this, like the canary (lowercase)
+          env:
+            - name: PROM_URL
+              value: http://prometheus.monitoring.svc.cluster.local:9090
+            - name: NAMESPACE
+              value: canary
+            - name: DEPLOYMENT
+              value: canary-app
+            - name: THRESHOLD
+              value: "0.20"
+            - name: WINDOW
+              value: "30s"
+            - name: BREACHES
+              value: "3"
+            - name: COOLDOWN
+              value: "60"
+            - name: HOME
+              value: /tmp # kubectl writes its discovery cache under $HOME
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true # so give kubectl a writable /tmp below
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}

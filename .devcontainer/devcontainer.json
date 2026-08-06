@@ -4,8 +4,12 @@
   "features": {
     "ghcr.io/devcontainers/features/docker-in-docker:2": {}
   },
-  "hostRequirements": { "cpus": 2, "memory": "8gb", "storage": "32gb" },
-  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "hostRequirements": {
+    "cpus": 2,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+  "onCreateCommand": "bash .devcontainer/setup.sh",
   "postAttachCommand": "bash .devcontainer/welcome.sh",
   "forwardPorts": [3000, 8080, 9090],
   "portsAttributes": {

@@ -1,0 +1,38 @@
+# Fast scrape interval (5s) so error spikes and the resulting rollback show up
+# quickly — this is what makes the MTTR number small and the demo legible.
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  # Annotation-based pod discovery. Any pod carrying prometheus.io/scrape=true
+  # (which the base contract adds to every app) gets scraped — no per-app config.
+  - job_name: kubernetes-pods
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: "true"
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels:
+          [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+      - action: labelmap
+        regex: __meta_kubernetes_pod_label_(.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
+      # Only scrape pods that are actually Running/Ready-ish (have an IP).
+      - source_labels: [__meta_kubernetes_pod_phase]
+        action: keep
+        regex: Running

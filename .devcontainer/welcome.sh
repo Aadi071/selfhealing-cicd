@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 cat <<'EOF'
 
-  === Self-Healing CI/CD Platform - Codespace ready ===
+  ┌────────────────────────────────────────────────────────────┐
+  │  Self-Healing CI/CD Platform — Codespace ready.            │
+  └────────────────────────────────────────────────────────────┘
 
-  Bring up the whole platform (a few minutes first time):
+  Stand up the whole platform (takes a few minutes the first time):
+
       ./quickstart.sh
 
   Then watch a green deploy heal itself:
@@ -11,5 +14,8 @@ cat <<'EOF'
       curl -XPOST http://localhost:8080/fault/on
       kubectl -n canary logs deploy/healer -f
 
-  Tear down:  ./teardown.sh
+  Grafana:  kubectl -n monitoring port-forward svc/grafana 3000:3000
+            (VS Code will offer to open the forwarded port)
+
+  Tear down: ./teardown.sh
 EOF
